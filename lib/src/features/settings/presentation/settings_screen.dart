@@ -242,7 +242,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (result == ReminderToggleResult.permissionDenied) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Notification permission was denied.')),
+        const SnackBar(
+          content: Text('Notification or exact alarm permission was denied.'),
+        ),
       );
       return;
     }

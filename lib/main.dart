@@ -1,20 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() {
-  runApp(const MainApp());
-}
+import 'src/app/app.dart';
+import 'src/app/app_bootstrap.dart';
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final bootstrap = await bootstrapApp();
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
-      ),
-    );
-  }
+  runApp(
+    ProviderScope(overrides: bootstrap.overrides, child: const QuickLogApp()),
+  );
 }

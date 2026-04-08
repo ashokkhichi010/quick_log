@@ -13,8 +13,12 @@ void main() {
     tester,
   ) async {
     final entriesRepository = FakeEntriesRepository();
-    final categoriesRepository = FakeCategoriesRepository(Category.seededCategories);
-    final settingsRepository = FakeSettingsRepository(const AppSettings.defaults());
+    final categoriesRepository = FakeCategoriesRepository(
+      Category.seededCategories,
+    );
+    final settingsRepository = FakeSettingsRepository(
+      const AppSettings.defaults(),
+    );
     final notificationsService = FakeNotificationsService();
     final exportService = FakeExportService();
 
@@ -37,6 +41,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Quick Add Entry'), findsOneWidget);
+    expect(find.text('All results'), findsNothing);
+
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+
+    expect(find.text('All results'), findsOneWidget);
 
     await tester.tap(find.text('Quick Add Entry'));
     await tester.pumpAndSettle();

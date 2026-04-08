@@ -23,16 +23,24 @@ class LogsScreen extends ConsumerStatefulWidget {
 
 class _LogsScreenState extends ConsumerState<LogsScreen> {
   late final TextEditingController _searchController;
+  late final FocusNode _searchFocusNode;
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController();
+    _searchFocusNode = FocusNode()
+      ..addListener(() {
+        if (mounted) {
+          setState(() {});
+        }
+      });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -60,6 +68,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
         entriesState.isLoading ||
         categoriesState.isLoading ||
         settingsState.isLoading;
+    final showFilters = _searchFocusNode.hasFocus;
 
     return Scaffold(
       appBar: AppBar(
@@ -85,9 +94,11 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                         children: [
                           TextField(
                             controller: _searchController,
+                            focusNode: _searchFocusNode,
                             onChanged: ref
                                 .read(entriesControllerProvider.notifier)
                                 .setSearchQuery,
+                            onTapOutside: (_) => _searchFocusNode.unfocus(),
                             decoration: InputDecoration(
                               prefixIcon: const Icon(Icons.search_rounded),
                               suffixIcon: entriesState.searchQuery.isEmpty
@@ -107,27 +118,50 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                               hintText: 'Search tasks, problems, or notes',
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          _FilterStrip(
-                            categories: categories,
-                            selectedCategoryId: entriesState.selectedCategoryId,
-                            selectedResult: entriesState.selectedResult,
-                            importantOnly: entriesState.importantOnly,
-                            onCategorySelected: ref
-                                .read(entriesControllerProvider.notifier)
-                                .setCategoryFilter,
-                            onResultSelected: ref
-                                .read(entriesControllerProvider.notifier)
-                                .setResultFilter,
-                            onImportantToggle: ref
-                                .read(entriesControllerProvider.notifier)
-                                .toggleImportantFilter,
-                            onClear: () {
-                              _searchController.clear();
-                              ref
-                                  .read(entriesControllerProvider.notifier)
-                                  .clearFilters();
-                            },
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 180),
+                            switchInCurve: Curves.easeOut,
+                            switchOutCurve: Curves.easeIn,
+                            child: showFilters
+                                ? Padding(
+                                    key: const ValueKey('filter-strip-open'),
+                                    padding: const EdgeInsets.only(top: 16),
+                                    child: _FilterStrip(
+                                      categories: categories,
+                                      selectedCategoryId:
+                                          entriesState.selectedCategoryId,
+                                      selectedResult:
+                                          entriesState.selectedResult,
+                                      importantOnly: entriesState.importantOnly,
+                                      onCategorySelected: ref
+                                          .read(
+                                            entriesControllerProvider.notifier,
+                                          )
+                                          .setCategoryFilter,
+                                      onResultSelected: ref
+                                          .read(
+                                            entriesControllerProvider.notifier,
+                                          )
+                                          .setResultFilter,
+                                      onImportantToggle: ref
+                                          .read(
+                                            entriesControllerProvider.notifier,
+                                          )
+                                          .toggleImportantFilter,
+                                      onClear: () {
+                                        _searchController.clear();
+                                        ref
+                                            .read(
+                                              entriesControllerProvider
+                                                  .notifier,
+                                            )
+                                            .clearFilters();
+                                      },
+                                    ),
+                                  )
+                                : const SizedBox.shrink(
+                                    key: ValueKey('filter-strip-closed'),
+                                  ),
                           ),
                         ],
                       ),

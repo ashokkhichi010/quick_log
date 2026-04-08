@@ -1,7 +1,22 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+class ReminderAlertEvent {
+  const ReminderAlertEvent({
+    required this.message,
+    required this.notificationId,
+    required this.triggeredAt,
+  });
+
+  final String message;
+  final int notificationId;
+  final DateTime triggeredAt;
+}
 
 abstract class NotificationsService {
   Future<void> initialize();
@@ -14,6 +29,12 @@ abstract class NotificationsService {
   });
 
   Future<void> cancelAllReminders();
+
+  Stream<ReminderAlertEvent> get reminderAlerts;
+
+  bool get hasPendingReminderAlert;
+
+  ReminderAlertEvent? consumeInitialReminderAlert();
 }
 
 class LocalNotificationsService implements NotificationsService {
@@ -23,9 +44,28 @@ class LocalNotificationsService implements NotificationsService {
   static const _channelId = 'quick_log_reminders';
   static const _notificationIdStart = 9000;
   static const _maxReminderSlotsPerDay = 48;
+  static const _payloadType = 'quick_log_reminder';
 
   final FlutterLocalNotificationsPlugin _plugin;
+  final StreamController<ReminderAlertEvent> _reminderAlertsController =
+      StreamController<ReminderAlertEvent>.broadcast();
+
   bool _timezoneReady = false;
+  ReminderAlertEvent? _initialReminderAlert;
+
+  @override
+  Stream<ReminderAlertEvent> get reminderAlerts =>
+      _reminderAlertsController.stream;
+
+  @override
+  bool get hasPendingReminderAlert => _initialReminderAlert != null;
+
+  @override
+  ReminderAlertEvent? consumeInitialReminderAlert() {
+    final reminderAlert = _initialReminderAlert;
+    _initialReminderAlert = null;
+    return reminderAlert;
+  }
 
   @override
   Future<void> initialize() async {
@@ -37,13 +77,24 @@ class LocalNotificationsService implements NotificationsService {
 
     await _plugin.initialize(
       settings: const InitializationSettings(android: androidInitialization),
+      onDidReceiveNotificationResponse: _handleNotificationResponse,
     );
+
+    final launchDetails = await _plugin.getNotificationAppLaunchDetails();
+    final launchedFromNotification =
+        launchDetails?.didNotificationLaunchApp ?? false;
+    if (launchedFromNotification) {
+      _initialReminderAlert = _reminderAlertFromPayload(
+        payload: launchDetails?.notificationResponse?.payload,
+        notificationId: launchDetails?.notificationResponse?.id,
+      );
+    }
 
     const channel = AndroidNotificationChannel(
       _channelId,
       'Quick Log reminders',
       description: 'Reminders to capture work updates throughout the day.',
-      importance: Importance.high,
+      importance: Importance.max,
     );
 
     await _plugin
@@ -68,7 +119,12 @@ class LocalNotificationsService implements NotificationsService {
 
     final exactAlarmGranted = await androidImplementation
         ?.requestExactAlarmsPermission();
-    return exactAlarmGranted ?? true;
+    if (!(exactAlarmGranted ?? true)) {
+      return false;
+    }
+
+    await androidImplementation?.requestFullScreenIntentPermission();
+    return true;
   }
 
   @override
@@ -83,12 +139,13 @@ class LocalNotificationsService implements NotificationsService {
     for (var index = 0; index < slotMinutes.length; index++) {
       await _plugin.zonedSchedule(
         id: _notificationIdStart + index,
-        title: 'Quick Log',
+        title: 'Quick Log reminder',
         body: message,
         scheduledDate: _nextSlotOccurrence(slotMinutes[index]),
         notificationDetails: _notificationDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
         matchDateTimeComponents: DateTimeComponents.time,
+        payload: _encodePayload(message),
       );
     }
   }
@@ -106,10 +163,14 @@ class LocalNotificationsService implements NotificationsService {
       'Quick Log reminders',
       channelDescription:
           'Reminders to capture work updates throughout the day.',
-      importance: Importance.high,
-      priority: Priority.high,
-      category: AndroidNotificationCategory.reminder,
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.alarm,
+      fullScreenIntent: true,
+      visibility: NotificationVisibility.public,
       ticker: 'Quick Log reminder',
+      playSound: true,
+      enableVibration: true,
     ),
   );
 
@@ -151,5 +212,54 @@ class LocalNotificationsService implements NotificationsService {
     }
 
     _timezoneReady = true;
+  }
+
+  void _handleNotificationResponse(NotificationResponse response) {
+    final reminderAlert = _reminderAlertFromPayload(
+      payload: response.payload,
+      notificationId: response.id,
+    );
+    if (reminderAlert != null) {
+      _reminderAlertsController.add(reminderAlert);
+    }
+  }
+
+  String _encodePayload(String message) {
+    return jsonEncode(<String, String>{
+      'type': _payloadType,
+      'message': message,
+    });
+  }
+
+  ReminderAlertEvent? _reminderAlertFromPayload({
+    required String? payload,
+    required int? notificationId,
+  }) {
+    if (payload == null) {
+      return ReminderAlertEvent(
+        message: 'What are you working on?',
+        notificationId: notificationId ?? _notificationIdStart,
+        triggeredAt: DateTime.now(),
+      );
+    }
+
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic> && decoded['type'] == _payloadType) {
+        return ReminderAlertEvent(
+          message: decoded['message'] as String? ?? 'What are you working on?',
+          notificationId: notificationId ?? _notificationIdStart,
+          triggeredAt: DateTime.now(),
+        );
+      }
+    } catch (_) {
+      return ReminderAlertEvent(
+        message: payload,
+        notificationId: notificationId ?? _notificationIdStart,
+        triggeredAt: DateTime.now(),
+      );
+    }
+
+    return null;
   }
 }

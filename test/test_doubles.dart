@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:quick_log/src/core/models/export_format.dart';
 import 'package:quick_log/src/core/services/export_service.dart';
 import 'package:quick_log/src/core/services/notifications_service.dart';
@@ -92,15 +94,30 @@ class FakeSettingsRepository implements SettingsRepository {
 }
 
 class FakeNotificationsService implements NotificationsService {
-  FakeNotificationsService({
-    this.permissionGranted = true,
-  });
+  FakeNotificationsService({this.permissionGranted = true});
 
   bool permissionGranted;
   int? scheduledIntervalMinutes;
   String? scheduledMessage;
   bool remindersCancelled = false;
   bool initialized = false;
+  ReminderAlertEvent? initialReminderAlert;
+  final StreamController<ReminderAlertEvent> _reminderAlertsController =
+      StreamController<ReminderAlertEvent>.broadcast();
+
+  @override
+  Stream<ReminderAlertEvent> get reminderAlerts =>
+      _reminderAlertsController.stream;
+
+  @override
+  bool get hasPendingReminderAlert => initialReminderAlert != null;
+
+  @override
+  ReminderAlertEvent? consumeInitialReminderAlert() {
+    final reminderAlert = initialReminderAlert;
+    initialReminderAlert = null;
+    return reminderAlert;
+  }
 
   @override
   Future<void> cancelAllReminders() async {
@@ -122,6 +139,10 @@ class FakeNotificationsService implements NotificationsService {
   }) async {
     scheduledIntervalMinutes = intervalMinutes;
     scheduledMessage = message;
+  }
+
+  void emitReminderAlert(ReminderAlertEvent event) {
+    _reminderAlertsController.add(event);
   }
 }
 

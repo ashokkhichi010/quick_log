@@ -3,6 +3,7 @@ import 'package:hive/hive.dart';
 import '../../features/logs/domain/category.dart';
 import '../../features/logs/domain/entry_result.dart';
 import '../../features/logs/domain/log_entry.dart';
+import '../../features/logs/domain/log_entry_type.dart';
 import '../../features/settings/domain/app_settings.dart';
 
 class LogEntryAdapter extends TypeAdapter<LogEntry> {
@@ -24,6 +25,9 @@ class LogEntryAdapter extends TypeAdapter<LogEntry> {
       timestamp: fields[1] as DateTime,
       task: fields[2] as String,
       categoryId: fields[3] as String,
+      entryType: fields.containsKey(11)
+          ? LogEntryType.values[fields[11] as int]
+          : LogEntryType.manual,
       problem: fields[4] as String?,
       solutionTried: fields[5] as String?,
       result: EntryResult.values[fields[6] as int],
@@ -37,7 +41,7 @@ class LogEntryAdapter extends TypeAdapter<LogEntry> {
   @override
   void write(BinaryWriter writer, LogEntry obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -59,7 +63,9 @@ class LogEntryAdapter extends TypeAdapter<LogEntry> {
       ..writeByte(9)
       ..write(obj.createdAt)
       ..writeByte(10)
-      ..write(obj.updatedAt);
+      ..write(obj.updatedAt)
+      ..writeByte(11)
+      ..write(obj.entryType.index);
   }
 }
 
@@ -111,20 +117,44 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
         reader.readByte(): reader.read(),
     };
 
+    final rawCheckedIn = fields[4];
+    final rawSessionStartedAt = fields[5];
+    final rawCheckedOutAt = fields[6];
+    final rawLastUsedCategoryId = fields[7];
+    final rawLastUsedResult = fields[8];
+
+    final lastUsedCategoryId =
+        rawLastUsedCategoryId is String
+            ? rawLastUsedCategoryId
+            : rawCheckedIn is String
+            ? rawCheckedIn
+            : Category.fallbackCategoryId;
+    final lastUsedResultIndex =
+        rawLastUsedResult is int
+            ? rawLastUsedResult
+            : rawSessionStartedAt is int
+            ? rawSessionStartedAt
+            : EntryResult.partial.index;
+
     return AppSettings(
       themeMode: AppThemeMode.values[fields[0] as int],
       remindersEnabled: fields[1] as bool,
       reminderIntervalMinutes: fields[2] as int,
       reminderMessage: fields[3] as String,
-      lastUsedCategoryId: fields[4] as String,
-      lastUsedResult: EntryResult.values[fields[5] as int],
+      isCheckedIn: rawCheckedIn is bool ? rawCheckedIn : false,
+      activeSessionStartedAt: rawSessionStartedAt is DateTime
+          ? rawSessionStartedAt
+          : null,
+      lastCheckedOutAt: rawCheckedOutAt is DateTime ? rawCheckedOutAt : null,
+      lastUsedCategoryId: lastUsedCategoryId,
+      lastUsedResult: EntryResult.values[lastUsedResultIndex],
     );
   }
 
   @override
   void write(BinaryWriter writer, AppSettings obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.themeMode.index)
       ..writeByte(1)
@@ -134,8 +164,14 @@ class AppSettingsAdapter extends TypeAdapter<AppSettings> {
       ..writeByte(3)
       ..write(obj.reminderMessage)
       ..writeByte(4)
-      ..write(obj.lastUsedCategoryId)
+      ..write(obj.isCheckedIn)
       ..writeByte(5)
+      ..write(obj.activeSessionStartedAt)
+      ..writeByte(6)
+      ..write(obj.lastCheckedOutAt)
+      ..writeByte(7)
+      ..write(obj.lastUsedCategoryId)
+      ..writeByte(8)
       ..write(obj.lastUsedResult.index);
   }
 }

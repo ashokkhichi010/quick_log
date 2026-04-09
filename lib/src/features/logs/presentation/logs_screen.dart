@@ -2,6 +2,7 @@ import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../app/app_providers.dart';
 import '../../../app/app_routes.dart';
@@ -24,6 +25,7 @@ class LogsScreen extends ConsumerStatefulWidget {
 class _LogsScreenState extends ConsumerState<LogsScreen> {
   late final TextEditingController _searchController;
   late final FocusNode _searchFocusNode;
+  bool _isCheckingOut = false;
 
   @override
   void initState() {
@@ -50,6 +52,7 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
     final categoriesState = ref.watch(categoriesControllerProvider);
     final settingsState = ref.watch(appSettingsControllerProvider);
     final categories = categoriesState.categories;
+    final appSettings = settingsState.settings;
 
     if (_searchController.text != entriesState.searchQuery) {
       _searchController.value = TextEditingValue(
@@ -70,10 +73,63 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
         settingsState.isLoading;
     final showFilters = _searchFocusNode.hasFocus;
 
+    if (!isLoading && !appSettings.isCheckedIn && !_isCheckingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.checkIn, (route) => false);
+      });
+
+      return const Scaffold(body: SizedBox.shrink());
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Quick Log'),
         actions: [
+          TextButton.icon(
+            onPressed: () async {
+              if (_isCheckingOut) {
+                return;
+              }
+
+              final messenger = ScaffoldMessenger.of(context);
+              final navigator = Navigator.of(context);
+              final settingsController = ref.read(
+                appSettingsControllerProvider.notifier,
+              );
+              final entriesController = ref.read(
+                entriesControllerProvider.notifier,
+              );
+
+              setState(() {
+                _isCheckingOut = true;
+              });
+
+              await settingsController.checkOut();
+              await entriesController.loadEntries();
+              if (!mounted) {
+                return;
+              }
+              messenger.showSnackBar(
+                const SnackBar(content: Text('Checked out successfully.')),
+              );
+              navigator.pushNamedAndRemoveUntil(
+                AppRoutes.checkIn,
+                (route) => false,
+              );
+              if (mounted) {
+                setState(() {
+                  _isCheckingOut = false;
+                });
+              }
+            },
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Checkout'),
+          ),
           IconButton(
             onPressed: () =>
                 Navigator.of(context).pushNamed(AppRoutes.settings),
@@ -92,6 +148,10 @@ class _LogsScreenState extends ConsumerState<LogsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _SessionBanner(
+                            checkedInAt: appSettings.activeSessionStartedAt,
+                          ),
+                          const SizedBox(height: 16),
                           TextField(
                             controller: _searchController,
                             focusNode: _searchFocusNode,
@@ -416,6 +476,37 @@ class _FilterStrip extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SessionBanner extends StatelessWidget {
+  const _SessionBanner({required this.checkedInAt});
+
+  final DateTime? checkedInAt;
+
+  @override
+  Widget build(BuildContext context) {
+    final startedAt = checkedInAt;
+    final label = startedAt == null
+        ? 'Session active'
+        : 'Checked in at ${DateFormat('h:mm a').format(startedAt)}';
+
+    return Row(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            color: Colors.green.shade500,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(label, style: Theme.of(context).textTheme.titleMedium),
         ),
       ],
     );

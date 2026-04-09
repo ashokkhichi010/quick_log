@@ -1,35 +1,49 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/app_providers.dart';
 import '../../../app/app_routes.dart';
 import '../../../core/widgets/soft_ui.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(milliseconds: 2300), () {
-      if (!mounted) {
-        return;
-      }
-      Navigator.of(context).pushReplacementNamed(AppRoutes.logs);
-    });
+    _timer = Timer(const Duration(milliseconds: 2300), _navigateNext);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _navigateNext() {
+    if (!mounted) {
+      return;
+    }
+
+    final settingsState = ref.read(appSettingsControllerProvider);
+    if (settingsState.isLoading) {
+      _timer = Timer(const Duration(milliseconds: 150), _navigateNext);
+      return;
+    }
+
+    final nextRoute = settingsState.settings.isCheckedIn
+        ? AppRoutes.logs
+        : AppRoutes.checkIn;
+    Navigator.of(context).pushReplacementNamed(nextRoute);
   }
 
   @override

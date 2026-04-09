@@ -60,5 +60,7 @@ final appSettingsControllerProvider =
       (ref) => AppSettingsController(
         repository: ref.read(settingsRepositoryProvider),
         notificationsService: ref.read(notificationsServiceProvider),
+        entriesRepository: ref.read(entriesRepositoryProvider),
+        uuid: ref.read(uuidProvider),
       ),
     );

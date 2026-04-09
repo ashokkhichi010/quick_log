@@ -16,6 +16,8 @@ class FakeEntriesRepository implements EntriesRepository {
 
   final List<LogEntry> _entries;
 
+  List<LogEntry> get entriesSnapshot => [..._entries];
+
   @override
   Future<void> deleteEntry(String entryId) async {
     _entries.removeWhere((item) => item.id == entryId);

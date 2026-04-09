@@ -6,6 +6,7 @@ import 'package:quick_log/src/core/storage/hive_adapters.dart';
 import 'package:quick_log/src/features/logs/data/hive_entries_repository.dart';
 import 'package:quick_log/src/features/logs/domain/entry_result.dart';
 import 'package:quick_log/src/features/logs/domain/log_entry.dart';
+import 'package:quick_log/src/features/logs/domain/log_entry_type.dart';
 
 void main() {
   late Directory tempDirectory;
@@ -34,6 +35,7 @@ void main() {
       timestamp: DateTime(2026, 4, 8, 9),
       task: 'Debugged sensor issues',
       categoryId: 'iot',
+      entryType: LogEntryType.manual,
       problem: null,
       solutionTried: null,
       result: EntryResult.partial,
@@ -47,6 +49,7 @@ void main() {
       timestamp: DateTime(2026, 4, 8, 11),
       task: 'Shipped quick-add UI',
       categoryId: 'flutter',
+      entryType: LogEntryType.manual,
       problem: null,
       solutionTried: null,
       result: EntryResult.worked,

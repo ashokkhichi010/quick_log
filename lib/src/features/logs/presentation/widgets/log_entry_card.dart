@@ -4,6 +4,7 @@ import '../../../../core/utils/date_time_formatters.dart';
 import '../../../../core/widgets/soft_ui.dart';
 import '../../domain/entry_result.dart';
 import '../../domain/log_entry.dart';
+import '../../domain/log_entry_type.dart';
 
 enum EntryMenuAction { edit, duplicate, delete }
 
@@ -28,11 +29,117 @@ class LogEntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accentColor = switch (entry.result) {
-      EntryResult.worked => Colors.green.shade600,
-      EntryResult.notWorked => Colors.red.shade400,
-      EntryResult.partial => Colors.orange.shade500,
+    final accentColor = switch (entry.entryType) {
+      LogEntryType.checkIn => Colors.blue.shade600,
+      LogEntryType.checkOut => Colors.deepOrange.shade500,
+      LogEntryType.manual => switch (entry.result) {
+        EntryResult.worked => Colors.green.shade600,
+        EntryResult.notWorked => Colors.red.shade400,
+        EntryResult.partial => Colors.orange.shade500,
+      },
     };
+    final canInteract = entry.isEditable;
+    final content = GestureDetector(
+      onTap: canInteract ? onEdit : null,
+      child: SoftSurface(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _CapsuleLabel(
+                            icon: Icons.schedule_rounded,
+                            text: formatEntryTime(entry.timestamp),
+                          ),
+                          _CapsuleLabel(
+                            icon: switch (entry.entryType) {
+                              LogEntryType.checkIn => Icons.login_rounded,
+                              LogEntryType.checkOut => Icons.logout_rounded,
+                              LogEntryType.manual => Icons.sell_outlined,
+                            },
+                            text: entry.isSessionEvent
+                                ? entry.entryType.label
+                                : categoryName,
+                          ),
+                          _CapsuleLabel(
+                            icon: entry.isImportant
+                                ? Icons.star_rounded
+                                : entry.isSessionEvent
+                                ? Icons.event_available_rounded
+                                : Icons.track_changes_rounded,
+                            text: entry.isImportant
+                                ? 'Important'
+                                : entry.isSessionEvent
+                                ? entry.entryType.label
+                                : entry.result.label,
+                            accentColor: accentColor,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(entry.task, style: theme.textTheme.titleMedium),
+                    ],
+                  ),
+                ),
+                if (canInteract)
+                  PopupMenuButton<EntryMenuAction>(
+                    onSelected: (action) {
+                      switch (action) {
+                        case EntryMenuAction.edit:
+                          onEdit();
+                        case EntryMenuAction.duplicate:
+                          onDuplicate();
+                        case EntryMenuAction.delete:
+                          onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(
+                        value: EntryMenuAction.edit,
+                        child: Text('Edit'),
+                      ),
+                      PopupMenuItem(
+                        value: EntryMenuAction.duplicate,
+                        child: Text('Duplicate'),
+                      ),
+                      PopupMenuItem(
+                        value: EntryMenuAction.delete,
+                        child: Text('Delete'),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            if (entry.problem != null) ...[
+              const SizedBox(height: 14),
+              _InsightRow(label: 'Problem', value: entry.problem!),
+            ],
+            if (entry.solutionTried != null) ...[
+              const SizedBox(height: 10),
+              _InsightRow(label: 'Solution', value: entry.solutionTried!),
+            ],
+            if (entry.notes != null) ...[
+              const SizedBox(height: 10),
+              _InsightRow(label: 'Notes', value: entry.notes!),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    if (!canInteract) {
+      return content;
+    }
 
     return Dismissible(
       key: ValueKey('entry-${entry.id}'),
@@ -66,92 +173,7 @@ class LogEntryCard extends StatelessWidget {
           ],
         ),
       ),
-      child: GestureDetector(
-        onTap: onEdit,
-        child: SoftSurface(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _CapsuleLabel(
-                              icon: Icons.schedule_rounded,
-                              text: formatEntryTime(entry.timestamp),
-                            ),
-                            _CapsuleLabel(
-                              icon: Icons.sell_outlined,
-                              text: categoryName,
-                            ),
-                            _CapsuleLabel(
-                              icon: entry.isImportant
-                                  ? Icons.star_rounded
-                                  : Icons.track_changes_rounded,
-                              text: entry.isImportant
-                                  ? 'Important'
-                                  : entry.result.label,
-                              accentColor: accentColor,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(entry.task, style: theme.textTheme.titleMedium),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<EntryMenuAction>(
-                    onSelected: (action) {
-                      switch (action) {
-                        case EntryMenuAction.edit:
-                          onEdit();
-                        case EntryMenuAction.duplicate:
-                          onDuplicate();
-                        case EntryMenuAction.delete:
-                          onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(
-                        value: EntryMenuAction.edit,
-                        child: Text('Edit'),
-                      ),
-                      PopupMenuItem(
-                        value: EntryMenuAction.duplicate,
-                        child: Text('Duplicate'),
-                      ),
-                      PopupMenuItem(
-                        value: EntryMenuAction.delete,
-                        child: Text('Delete'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              if (entry.problem != null) ...[
-                const SizedBox(height: 14),
-                _InsightRow(label: 'Problem', value: entry.problem!),
-              ],
-              if (entry.solutionTried != null) ...[
-                const SizedBox(height: 10),
-                _InsightRow(label: 'Solution', value: entry.solutionTried!),
-              ],
-              if (entry.notes != null) ...[
-                const SizedBox(height: 10),
-                _InsightRow(label: 'Notes', value: entry.notes!),
-              ],
-            ],
-          ),
-        ),
-      ),
+      child: content,
     );
   }
 }

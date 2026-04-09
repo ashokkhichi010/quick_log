@@ -1,7 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/services/notifications_service.dart';
 import '../../../logs/domain/entry_result.dart';
+import '../../../logs/domain/log_entry.dart';
+import '../../../logs/domain/log_entry_type.dart';
+import '../../../logs/domain/repositories/entries_repository.dart';
 import '../../domain/app_settings.dart';
 import '../../domain/repositories/settings_repository.dart';
 
@@ -29,14 +33,20 @@ class AppSettingsController extends StateNotifier<AppSettingsState> {
   AppSettingsController({
     required SettingsRepository repository,
     required NotificationsService notificationsService,
+    required EntriesRepository entriesRepository,
+    required Uuid uuid,
   }) : _repository = repository,
        _notificationsService = notificationsService,
+       _entriesRepository = entriesRepository,
+       _uuid = uuid,
        super(const AppSettingsState.initial()) {
     loadSettings();
   }
 
   final SettingsRepository _repository;
   final NotificationsService _notificationsService;
+  final EntriesRepository _entriesRepository;
+  final Uuid _uuid;
 
   Future<void> loadSettings() async {
     final settings = await _repository.fetchSettings();
@@ -45,6 +55,49 @@ class AppSettingsController extends StateNotifier<AppSettingsState> {
 
   Future<void> setThemeMode(AppThemeMode mode) async {
     await _persist(state.settings.copyWith(themeMode: mode));
+  }
+
+  Future<void> checkIn() async {
+    if (state.settings.isCheckedIn) {
+      return;
+    }
+
+    final checkInTime = DateTime.now();
+    final nextSettings = state.settings.copyWith(
+      isCheckedIn: true,
+      activeSessionStartedAt: checkInTime,
+    );
+    await _persist(nextSettings);
+    await _entriesRepository.saveEntry(
+      LogEntry.sessionEvent(
+        id: _uuid.v4(),
+        type: LogEntryType.checkIn,
+        timestamp: checkInTime,
+      ),
+    );
+    await _syncNotifications(nextSettings);
+  }
+
+  Future<void> checkOut() async {
+    if (!state.settings.isCheckedIn) {
+      return;
+    }
+
+    final checkOutTime = DateTime.now();
+    final nextSettings = state.settings.copyWith(
+      isCheckedIn: false,
+      activeSessionStartedAt: null,
+      lastCheckedOutAt: checkOutTime,
+    );
+    await _persist(nextSettings);
+    await _entriesRepository.saveEntry(
+      LogEntry.sessionEvent(
+        id: _uuid.v4(),
+        type: LogEntryType.checkOut,
+        timestamp: checkOutTime,
+      ),
+    );
+    await _syncNotifications(nextSettings);
   }
 
   Future<ReminderToggleResult> setRemindersEnabled(bool enabled) async {
@@ -97,7 +150,7 @@ class AppSettingsController extends StateNotifier<AppSettingsState> {
   }
 
   Future<void> _syncNotifications(AppSettings settings) async {
-    if (!settings.remindersEnabled) {
+    if (!settings.remindersEnabled || !settings.isCheckedIn) {
       await _notificationsService.cancelAllReminders();
       return;
     }

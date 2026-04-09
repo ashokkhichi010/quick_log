@@ -43,7 +43,7 @@ Future<AppBootstrapData> bootstrapApp() async {
   await notificationsService.initialize();
 
   final settings = await settingsRepository.fetchSettings();
-  if (settings.remindersEnabled) {
+  if (settings.remindersEnabled && settings.isCheckedIn) {
     await notificationsService.scheduleIntervalReminder(
       intervalMinutes: settings.reminderIntervalMinutes,
       message: settings.reminderMessage,

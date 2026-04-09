@@ -6,19 +6,17 @@ import 'package:quick_log/src/core/services/export_service.dart';
 import 'package:quick_log/src/features/logs/domain/category.dart';
 import 'package:quick_log/src/features/logs/domain/entry_result.dart';
 import 'package:quick_log/src/features/logs/domain/log_entry.dart';
+import 'package:quick_log/src/features/logs/domain/log_entry_type.dart';
 
 void main() {
   final builder = const ExportContentBuilder();
-  final category = Category(
-    id: 'flutter',
-    name: 'Flutter',
-    isDefault: true,
-  );
+  final category = Category(id: 'flutter', name: 'Flutter', isDefault: true);
   final entry = LogEntry(
     id: 'entry-1',
     timestamp: DateTime(2026, 4, 8, 10, 30),
     task: 'Built the timeline screen',
     categoryId: category.id,
+    entryType: LogEntryType.manual,
     problem: 'List felt too dense',
     solutionTried: 'Grouped logs by hour',
     result: EntryResult.worked,

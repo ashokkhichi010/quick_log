@@ -1,4 +1,6 @@
+import 'category.dart';
 import 'entry_result.dart';
+import 'log_entry_type.dart';
 
 const _unset = Object();
 
@@ -8,6 +10,7 @@ class LogEntry {
     required this.timestamp,
     required this.task,
     required this.categoryId,
+    required this.entryType,
     required this.problem,
     required this.solutionTried,
     required this.result,
@@ -21,6 +24,7 @@ class LogEntry {
   final DateTime timestamp;
   final String task;
   final String categoryId;
+  final LogEntryType entryType;
   final String? problem;
   final String? solutionTried;
   final EntryResult result;
@@ -36,6 +40,7 @@ class LogEntry {
       timestamp: draft.timestamp,
       task: draft.task.trim(),
       categoryId: draft.categoryId,
+      entryType: LogEntryType.manual,
       problem: _normalizeText(draft.problem),
       solutionTried: _normalizeText(draft.solutionTried),
       result: draft.result,
@@ -46,11 +51,41 @@ class LogEntry {
     );
   }
 
+  factory LogEntry.sessionEvent({
+    required String id,
+    required LogEntryType type,
+    DateTime? timestamp,
+  }) {
+    assert(type != LogEntryType.manual, 'Use LogEntry.create for manual logs.');
+    final eventTime = timestamp ?? DateTime.now();
+    final (task, notes) = switch (type) {
+      LogEntryType.checkIn => ('Checked in', 'Work session started'),
+      LogEntryType.checkOut => ('Checked out', 'Work session ended'),
+      LogEntryType.manual => ('Activity', null),
+    };
+
+    return LogEntry(
+      id: id,
+      timestamp: eventTime,
+      task: task,
+      categoryId: Category.fallbackCategoryId,
+      entryType: type,
+      problem: null,
+      solutionTried: null,
+      result: EntryResult.partial,
+      notes: notes,
+      isImportant: false,
+      createdAt: eventTime,
+      updatedAt: eventTime,
+    );
+  }
+
   LogEntry applyDraft(LogEntryDraft draft) {
     return copyWith(
       timestamp: draft.timestamp,
       task: draft.task.trim(),
       categoryId: draft.categoryId,
+      entryType: LogEntryType.manual,
       problem: _normalizeText(draft.problem),
       solutionTried: _normalizeText(draft.solutionTried),
       result: draft.result,
@@ -64,6 +99,7 @@ class LogEntry {
     DateTime? timestamp,
     String? task,
     String? categoryId,
+    LogEntryType? entryType,
     Object? problem = _unset,
     Object? solutionTried = _unset,
     EntryResult? result,
@@ -77,6 +113,7 @@ class LogEntry {
       timestamp: timestamp ?? this.timestamp,
       task: task ?? this.task,
       categoryId: categoryId ?? this.categoryId,
+      entryType: entryType ?? this.entryType,
       problem: identical(problem, _unset) ? this.problem : problem as String?,
       solutionTried: identical(solutionTried, _unset)
           ? this.solutionTried
@@ -88,6 +125,10 @@ class LogEntry {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+
+  bool get isSessionEvent => entryType != LogEntryType.manual;
+
+  bool get isEditable => !isSessionEvent;
 
   static String? _normalizeText(String? value) {
     final trimmed = value?.trim();

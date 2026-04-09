@@ -40,7 +40,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 2300));
     await tester.pumpAndSettle();
 
+    expect(find.text('Check in'), findsOneWidget);
+
+    await tester.tap(find.text('Check in'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Quick Add Entry'), findsOneWidget);
+    expect(find.text('Checked in'), findsOneWidget);
     expect(find.text('All results'), findsNothing);
 
     await tester.tap(find.byType(TextField));

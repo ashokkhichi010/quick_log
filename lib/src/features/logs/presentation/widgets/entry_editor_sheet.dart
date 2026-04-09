@@ -186,20 +186,21 @@ class _EntryEditorSheetState extends State<EntryEditorSheet> {
                 const SizedBox(height: 14),
                 Text('Result', style: theme.textTheme.labelLarge),
                 const SizedBox(height: 10),
-                SegmentedButton<EntryResult>(
-                  segments: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
                     for (final result in EntryResult.values)
-                      ButtonSegment<EntryResult>(
-                        value: result,
-                        label: Text(result.label),
+                      _ResultOptionChip(
+                        label: result.label,
+                        selected: _selectedResult == result,
+                        onTap: () {
+                          setState(() {
+                            _selectedResult = result;
+                          });
+                        },
                       ),
                   ],
-                  selected: {_selectedResult},
-                  onSelectionChanged: (selection) {
-                    setState(() {
-                      _selectedResult = selection.first;
-                    });
-                  },
                 ),
                 const SizedBox(height: 14),
                 TextButton.icon(
@@ -300,6 +301,65 @@ class _EntryEditorSheetState extends State<EntryEditorSheet> {
         solutionTried: _solutionController.text,
         result: _selectedResult,
         notes: _notesController.text,
+      ),
+    );
+  }
+}
+
+class _ResultOptionChip extends StatelessWidget {
+  const _ResultOptionChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.14)
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary.withValues(alpha: 0.55)
+                  : colorScheme.outlineVariant,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(Icons.check_rounded, size: 18, color: colorScheme.primary),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

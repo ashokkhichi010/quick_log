@@ -13,6 +13,7 @@ enum VoiceCaptureStatus {
   unavailable,
   permissionDenied,
   recording,
+  paused,
   processing,
   result,
   error,
@@ -101,8 +102,7 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
   Timer? _recordingTimer;
   bool _finishing = false;
   bool _manualStopRequested = false;
-  bool _restartInProgress = false;
-  bool _speechListeningEstablished = false;
+  bool _startingListening = false;
   String _committedTranscript = '';
   String _currentSegment = '';
 
@@ -161,8 +161,7 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
 
     _finishing = false;
     _manualStopRequested = false;
-    _restartInProgress = false;
-    _speechListeningEstablished = false;
+    _startingListening = false;
     state = state.copyWith(
       status: VoiceCaptureStatus.recording,
       permissionState: permission,
@@ -170,57 +169,19 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     );
     _startTimer();
 
-    await _speechService.startListening(
-      onResult: (words, isFinal) {
-        _updateLiveTranscript(words);
-        if (isFinal && _manualStopRequested) {
-          _commitCurrentSegment();
-          _completeRecognition();
-        }
-      },
-      onStatus: (status) async {
-        if (status == 'done' || status == 'notListening') {
-          if (_manualStopRequested) {
-            _commitCurrentSegment();
-            _completeRecognition();
-            return;
-          }
-
-          if (state.status == VoiceCaptureStatus.recording) {
-            _commitCurrentSegment();
-            await _restartListening();
-          }
-        }
-      },
-      onError: (errorMessage, permanent) {
-        if (!_manualStopRequested && state.status == VoiceCaptureStatus.recording) {
-          _commitCurrentSegment();
-          unawaited(_restartListening());
-          return;
-        }
-
-        if (state.liveTranscript.trim().isNotEmpty) {
-          _completeRecognition();
-          return;
-        }
-        state = state.copyWith(
-          status: VoiceCaptureStatus.error,
-          errorMessage: errorMessage,
-        );
-      },
-    );
-
-    _speechListeningEstablished = true;
+    await _beginListeningSession();
   }
 
   Future<void> stopRecording() async {
-    if (state.status != VoiceCaptureStatus.recording) {
+    if (state.status != VoiceCaptureStatus.recording &&
+        state.status != VoiceCaptureStatus.paused) {
       return;
     }
     _manualStopRequested = true;
-    _speechListeningEstablished = false;
     state = state.copyWith(status: VoiceCaptureStatus.processing);
-    await _speechService.stopListening();
+    if (_speechService.isListening) {
+      await _speechService.stopListening();
+    }
     _completeRecognition();
   }
 
@@ -228,7 +189,7 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     _stopTimer();
     _finishing = false;
     _manualStopRequested = true;
-    _speechListeningEstablished = false;
+    _startingListening = false;
     await _speechService.cancelListening();
     state = state.copyWith(
       status: VoiceCaptureStatus.idle,
@@ -255,6 +216,17 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     );
     _committedTranscript = '';
     _currentSegment = '';
+  }
+
+  Future<void> continueRecording() async {
+    if (state.status != VoiceCaptureStatus.paused) {
+      return;
+    }
+
+    _manualStopRequested = false;
+    state = state.copyWith(status: VoiceCaptureStatus.recording, errorMessage: null);
+    _startTimer();
+    await _beginListeningSession();
   }
 
   Future<LogEntry?> saveTranscript() async {
@@ -289,6 +261,7 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     _finishing = true;
     _stopTimer();
     _manualStopRequested = false;
+    _startingListening = false;
 
     final transcript = state.editableTranscript.trim();
     if (transcript.isEmpty) {
@@ -307,65 +280,6 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     _finishing = false;
   }
 
-  Future<void> _restartListening() async {
-    if (_manualStopRequested || state.status != VoiceCaptureStatus.recording) {
-      return;
-    }
-
-    if (_restartInProgress) return;
-    _restartInProgress = true;
-    _speechListeningEstablished = false;
-
-    try {
-      await _speechService.startListening(
-        onResult: (words, isFinal) {
-          _updateLiveTranscript(words);
-          if (isFinal && _manualStopRequested) {
-            _commitCurrentSegment();
-            _completeRecognition();
-          }
-        },
-        onStatus: (status) async {
-          if (status == 'done' || status == 'notListening') {
-            if (_manualStopRequested) {
-              _commitCurrentSegment();
-              _completeRecognition();
-              return;
-            }
-
-            if (state.status == VoiceCaptureStatus.recording) {
-              _commitCurrentSegment();
-              await _restartListening();
-            }
-          }
-        },
-        onError: (errorMessage, permanent) {
-          if (!_manualStopRequested &&
-              state.status == VoiceCaptureStatus.recording) {
-            _commitCurrentSegment();
-            unawaited(_restartListening());
-            return;
-          }
-
-          if (state.liveTranscript.trim().isNotEmpty) {
-            _completeRecognition();
-            return;
-          }
-
-          _stopTimer();
-          state = state.copyWith(
-            status: VoiceCaptureStatus.error,
-            errorMessage: errorMessage,
-          );
-        },
-      );
-
-      _speechListeningEstablished = true;
-    } finally {
-      _restartInProgress = false;
-    }
-  }
-
   void _updateLiveTranscript(String segment) {
     _currentSegment = segment.trim();
     final fullTranscript = _buildFullTranscript();
@@ -381,9 +295,31 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     if (segment.isEmpty) {
       return;
     }
-    _committedTranscript = _committedTranscript.trim().isEmpty
-        ? segment
-        : '${_committedTranscript.trim()} $segment';
+    final committed = _committedTranscript.trim();
+    if (committed.isEmpty) {
+      _committedTranscript = segment;
+    } else {
+      // Some recognizers resend previously captured text after pause/resume.
+      // Append only the delta to avoid duplicate transcript chunks.
+      final normalizedCommitted = _normalizeWhitespace(committed);
+      final normalizedSegment = _normalizeWhitespace(segment);
+
+      if (normalizedSegment == normalizedCommitted ||
+          normalizedCommitted.endsWith(normalizedSegment)) {
+        _currentSegment = '';
+        return;
+      }
+
+      if (normalizedSegment.startsWith(normalizedCommitted)) {
+        final delta = normalizedSegment.substring(normalizedCommitted.length).trim();
+        if (delta.isNotEmpty) {
+          _committedTranscript = '$committed $delta'.trim();
+        }
+      } else {
+        _committedTranscript = '$committed $segment'.trim();
+      }
+    }
+
     _currentSegment = '';
     final fullTranscript = _buildFullTranscript();
     state = state.copyWith(
@@ -405,22 +341,69 @@ class VoiceCaptureController extends StateNotifier<VoiceCaptureState> {
     return '$committed $segment';
   }
 
+  String _normalizeWhitespace(String value) {
+    return value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
   void _startTimer() {
+    final baseElapsed = state.elapsed;
     _stopTimer();
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      state = state.copyWith(elapsed: Duration(seconds: timer.tick));
-
-      // If the engine stops listening due to silence without emitting a
-      // matching status event quickly enough, restart to keep capture
-      // continuous while the UI stays in "recording".
-      if (!_manualStopRequested &&
-          state.status == VoiceCaptureStatus.recording &&
-          _speechListeningEstablished &&
-          !_speechService.isListening &&
-          !_restartInProgress) {
-        unawaited(_restartListening());
-      }
+      state = state.copyWith(
+        elapsed: baseElapsed + Duration(seconds: timer.tick),
+      );
     });
+  }
+
+  Future<void> _beginListeningSession() async {
+    if (_startingListening || _manualStopRequested) {
+      return;
+    }
+    _startingListening = true;
+    try {
+      await _speechService.startListening(
+        onResult: (words, isFinal) {
+          _updateLiveTranscript(words);
+          if (isFinal && _manualStopRequested) {
+            _commitCurrentSegment();
+            _completeRecognition();
+          }
+        },
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            if (_manualStopRequested) {
+              _commitCurrentSegment();
+              _completeRecognition();
+              return;
+            }
+            _pauseAfterEngineStopped();
+          }
+        },
+        onError: (errorMessage, permanent) {
+          if (_manualStopRequested) {
+            _completeRecognition();
+            return;
+          }
+          _pauseAfterEngineStopped(errorMessage: errorMessage);
+        },
+      );
+    } finally {
+      _startingListening = false;
+    }
+  }
+
+  void _pauseAfterEngineStopped({String? errorMessage}) {
+    if (state.status != VoiceCaptureStatus.recording) {
+      return;
+    }
+    _commitCurrentSegment();
+    _stopTimer();
+    state = state.copyWith(
+      status: VoiceCaptureStatus.paused,
+      errorMessage: errorMessage,
+      liveTranscript: _buildFullTranscript(),
+      editableTranscript: _buildFullTranscript(),
+    );
   }
 
   void _stopTimer() {

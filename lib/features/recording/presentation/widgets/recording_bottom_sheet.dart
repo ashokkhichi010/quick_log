@@ -100,6 +100,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
     }
 
     final isRecording = voiceState.status == VoiceCaptureStatus.recording;
+    final isPaused = voiceState.status == VoiceCaptureStatus.paused;
     final isProcessing = voiceState.status == VoiceCaptureStatus.processing;
     final showingResult = voiceState.status == VoiceCaptureStatus.result;
 
@@ -162,11 +163,13 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
               RecordingControls(
                 recording: isRecording,
                 processing: isProcessing,
+                paused: isPaused,
                 onMicPressed: _voiceCaptureController.toggleRecording,
+                onContinuePressed: _voiceCaptureController.continueRecording,
                 onStopPressed: _voiceCaptureController.stopRecording,
                 pulse: _pulseController,
                 statusLabel: _statusLabel(voiceState),
-                elapsedLabel: isRecording
+                elapsedLabel: (isRecording || isPaused)
                     ? _formatDuration(voiceState.elapsed)
                     : '',
               ),
@@ -211,6 +214,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
   String _statusLabel(VoiceCaptureState state) {
     return switch (state.status) {
       VoiceCaptureStatus.recording => 'Recording...',
+      VoiceCaptureStatus.paused => 'Recording paused. Continue to keep adding.',
       VoiceCaptureStatus.permissionDenied => 'Microphone permission needed',
       VoiceCaptureStatus.unavailable => 'Speech recognition unavailable',
       VoiceCaptureStatus.requestingPermission => 'Preparing microphone...',

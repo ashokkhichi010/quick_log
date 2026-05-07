@@ -5,7 +5,9 @@ class RecordingControls extends StatelessWidget {
     super.key,
     required this.recording,
     required this.processing,
+    required this.paused,
     required this.onMicPressed,
+    required this.onContinuePressed,
     required this.onStopPressed,
     required this.pulse,
     required this.statusLabel,
@@ -14,7 +16,9 @@ class RecordingControls extends StatelessWidget {
 
   final bool recording;
   final bool processing;
+  final bool paused;
   final VoidCallback onMicPressed;
+  final VoidCallback onContinuePressed;
   final VoidCallback onStopPressed;
   final Animation<double> pulse;
   final String statusLabel;
@@ -33,7 +37,9 @@ class RecordingControls extends StatelessWidget {
             return Transform.scale(scale: scale, child: child);
           },
           child: InkWell(
-            onTap: processing ? null : onMicPressed,
+            onTap: processing
+                ? null
+                : (paused ? onContinuePressed : onMicPressed),
             borderRadius: BorderRadius.circular(60),
             child: Container(
               width: 112,
@@ -45,7 +51,9 @@ class RecordingControls extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                recording ? Icons.stop_rounded : Icons.mic_rounded,
+                recording
+                    ? Icons.stop_rounded
+                    : (paused ? Icons.play_arrow_rounded : Icons.mic_rounded),
                 size: 46,
                 color: theme.colorScheme.primary,
               ),
@@ -64,6 +72,13 @@ class RecordingControls extends StatelessWidget {
             onPressed: onStopPressed,
             icon: const Icon(Icons.stop_circle_outlined),
             label: const Text('Stop'),
+          ),
+        ] else if (paused) ...[
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: onContinuePressed,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: const Text('Continue'),
           ),
         ],
       ],

@@ -8,6 +8,7 @@ class RecordingControls extends StatelessWidget {
     required this.paused,
     required this.onMicPressed,
     required this.onContinuePressed,
+    required this.onCompletePressed,
     required this.onStopPressed,
     required this.pulse,
     required this.statusLabel,
@@ -19,6 +20,7 @@ class RecordingControls extends StatelessWidget {
   final bool paused;
   final VoidCallback onMicPressed;
   final VoidCallback onContinuePressed;
+  final VoidCallback onCompletePressed;
   final VoidCallback onStopPressed;
   final Animation<double> pulse;
   final String statusLabel;
@@ -75,10 +77,24 @@ class RecordingControls extends StatelessWidget {
           ),
         ] else if (paused) ...[
           const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: onContinuePressed,
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('Continue'),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onContinuePressed,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Continue'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onCompletePressed,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Complete'),
+                ),
+              ),
+            ],
           ),
         ],
       ],

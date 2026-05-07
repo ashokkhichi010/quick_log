@@ -87,7 +87,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          color: const Color(0xFF0F233C),
+          color: const Color(0xFF0F172A),
           child: SafeArea(
             child: FadeTransition(
               opacity: _fadeAnimation,

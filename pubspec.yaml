@@ -42,5 +42,5 @@ flutter_launcher_icons:
   # adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 flutter_native_splash:
-  color: "#0F233C"              # Background color
+  color: "#0F172A"              # Background color
   image: assets/icons/SPLASH_ICON.png # Path to your splash icon

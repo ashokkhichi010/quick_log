@@ -47,27 +47,11 @@ class _HomeBottomNavigationBar extends StatelessWidget {
                 onTap: () {},
               ),
               BottomNavItem(
-                icon: Icons.archive_outlined,
-                label: 'Archived',
-                selected: false,
-                onTap: () {
-                  Navigator.of(context).pushNamed(AppRoutes.archivedLogs);
-                },
-              ),
-              BottomNavItem(
                 icon: Icons.mic_rounded,
                 label: 'Record',
                 selected: false,
                 isPrimaryAction: true,
                 onTap: () => showRecordingBottomSheet(context),
-              ),
-              BottomNavItem(
-                icon: Icons.delete_outline_rounded,
-                label: 'Trash',
-                selected: false,
-                onTap: () {
-                  Navigator.of(context).pushNamed(AppRoutes.deletedLogs);
-                },
               ),
               BottomNavItem(
                 icon: Icons.settings_outlined,

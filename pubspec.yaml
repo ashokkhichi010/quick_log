@@ -21,11 +21,21 @@ dependencies:
   speech_to_text: ^7.3.0
   timezone: ^0.11.0
   uuid: ^4.5.3
-
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icons/icon.png"
+  # For Android 8.0+ adaptive icons (Optional)
+  # adaptive_icon_background: "#ffffff" # or image path
+  # adaptive_icon_foreground: "assets/icon/icon_foreground.png"

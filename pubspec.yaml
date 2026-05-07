@@ -27,6 +27,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.7
 
 flutter:
   uses-material-design: true
@@ -39,3 +40,7 @@ flutter_launcher_icons:
   # For Android 8.0+ adaptive icons (Optional)
   # adaptive_icon_background: "#ffffff" # or image path
   # adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+
+flutter_native_splash:
+  color: "#0F233C"              # Background color
+  image: assets/icons/SPLASH_ICON.png # Path to your splash icon

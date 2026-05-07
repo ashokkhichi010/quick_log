@@ -33,31 +33,41 @@ class RecordingBottomSheet extends ConsumerStatefulWidget {
 class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
     with SingleTickerProviderStateMixin {
   late final TextEditingController _transcriptController;
+  late final FocusNode _transcriptFocusNode;
   late final ScrollController _scrollController;
   late final AnimationController _pulseController;
   late final VoiceCaptureController _voiceCaptureController;
+  late final ProviderSubscription<VoiceCaptureState> _voiceSubscription;
+
+  bool _syncingTranscriptField = false;
 
   @override
   void initState() {
     super.initState();
     _transcriptController = TextEditingController();
+    _transcriptFocusNode = FocusNode();
     _scrollController = ScrollController();
     _voiceCaptureController = ref.read(voiceCaptureControllerProvider.notifier);
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
+    _voiceSubscription = ref.listenManual<VoiceCaptureState>(
+      voiceCaptureControllerProvider,
+      _handleVoiceStateChanged,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _voiceCaptureController.clearResult();
-      unawaited(_voiceCaptureController.startRecording());
+      unawaited(_voiceCaptureController.beginNewCapture());
     });
   }
 
   @override
   void dispose() {
     _pulseController.stop();
+    _voiceSubscription.close();
     _transcriptController.dispose();
+    _transcriptFocusNode.dispose();
     _scrollController.dispose();
     _pulseController.dispose();
     super.dispose();
@@ -66,40 +76,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
   @override
   Widget build(BuildContext context) {
     final voiceState = ref.watch(voiceCaptureControllerProvider);
-
-    ref.listen<VoiceCaptureState>(voiceCaptureControllerProvider, (
-      previous,
-      next,
-    ) {
-      if (next.errorMessage != null &&
-          next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
-      }
-
-      if (next.liveTranscript != previous?.liveTranscript ||
-          next.editableTranscript != previous?.editableTranscript) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              _scrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
-            );
-          }
-        });
-      }
-    });
-
-    if (_transcriptController.text != voiceState.editableTranscript) {
-      _transcriptController.value = TextEditingValue(
-        text: voiceState.editableTranscript,
-        selection: TextSelection.collapsed(
-          offset: voiceState.editableTranscript.length,
-        ),
-      );
-    }
+    _syncTranscriptEditorIfNeeded(voiceState);
 
     final isRecording = voiceState.status == VoiceCaptureStatus.recording;
     final isPaused = voiceState.status == VoiceCaptureStatus.paused;
@@ -157,6 +134,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
             else if (showingResult)
               _ResultState(
                 controller: _transcriptController,
+                focusNode: _transcriptFocusNode,
                 onChanged: _voiceCaptureController.updateEditableTranscript,
                 onCancel: () => _cancelAndClose(context),
                 onContinueRecording: _voiceCaptureController.continueFromReview,
@@ -227,6 +205,67 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
     navigator.pop();
   }
 
+  void _handleVoiceStateChanged(
+    VoiceCaptureState? previous,
+    VoiceCaptureState next,
+  ) {
+    if (!mounted) {
+      return;
+    }
+
+    if (next.errorMessage != null &&
+        next.errorMessage != previous?.errorMessage) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+    }
+
+    if (next.liveTranscript != previous?.liveTranscript) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scrollController.hasClients) {
+          return;
+        }
+
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+        );
+      });
+    }
+  }
+
+  void _syncTranscriptEditorIfNeeded(VoiceCaptureState voiceState) {
+    final showingResult = voiceState.status == VoiceCaptureStatus.result;
+    if (!showingResult) {
+      return;
+    }
+
+    if (_transcriptFocusNode.hasFocus &&
+        !_syncingTranscriptField &&
+        _transcriptController.text == voiceState.editableTranscript) {
+      return;
+    }
+
+    if (_transcriptFocusNode.hasFocus &&
+        _transcriptController.text != voiceState.editableTranscript) {
+      return;
+    }
+
+    if (_transcriptController.text == voiceState.editableTranscript) {
+      return;
+    }
+
+    _syncingTranscriptField = true;
+    _transcriptController.value = TextEditingValue(
+      text: voiceState.editableTranscript,
+      selection: TextSelection.collapsed(
+        offset: voiceState.editableTranscript.length,
+      ),
+    );
+    _syncingTranscriptField = false;
+  }
+
   Future<void> _saveAndClose(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -265,6 +304,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
 class _ResultState extends StatelessWidget {
   const _ResultState({
     required this.controller,
+    required this.focusNode,
     required this.onChanged,
     required this.onCancel,
     required this.onContinueRecording,
@@ -272,6 +312,7 @@ class _ResultState extends StatelessWidget {
   });
 
   final TextEditingController controller;
+  final FocusNode focusNode;
   final ValueChanged<String> onChanged;
   final VoidCallback onCancel;
   final VoidCallback onContinueRecording;
@@ -288,7 +329,11 @@ class _ResultState extends StatelessWidget {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 12),
-        TranscriptEditor(controller: controller, onChanged: onChanged),
+        TranscriptEditor(
+          controller: controller,
+          focusNode: focusNode,
+          onChanged: onChanged,
+        ),
         const SizedBox(height: 14),
         Row(
           children: [

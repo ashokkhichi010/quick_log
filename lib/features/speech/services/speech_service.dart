@@ -54,6 +54,7 @@ class LocalSpeechService implements SpeechService {
 
   final SpeechToText _speechToText;
   bool _initialized = false;
+  int _callbackGeneration = 0;
   SpeechLocaleOption? _activeLocale;
   List<SpeechLocaleOption> _locales = const [];
   void Function(String words, bool isFinal)? _resultCallback;
@@ -128,9 +129,17 @@ class LocalSpeechService implements SpeechService {
     _resultCallback = onResult;
     _statusCallback = onStatus;
     _errorCallback = onError;
+    final generation = ++_callbackGeneration;
+
+    if (_speechToText.isListening) {
+      await _speechToText.cancel();
+    }
 
     await _speechToText.listen(
       onResult: (SpeechRecognitionResult result) {
+        if (generation != _callbackGeneration) {
+          return;
+        }
         _resultCallback?.call(result.recognizedWords, result.finalResult);
       },
       // `pauseFor` controls how long we wait for more speech before the
@@ -150,10 +159,23 @@ class LocalSpeechService implements SpeechService {
   }
 
   @override
-  Future<void> stopListening() => _speechToText.stop();
+  Future<void> stopListening() async {
+    _clearCallbacks();
+    await _speechToText.stop();
+  }
 
   @override
-  Future<void> cancelListening() => _speechToText.cancel();
+  Future<void> cancelListening() async {
+    _clearCallbacks();
+    await _speechToText.cancel();
+  }
+
+  void _clearCallbacks() {
+    _callbackGeneration++;
+    _resultCallback = null;
+    _statusCallback = null;
+    _errorCallback = null;
+  }
 
   Future<SpeechLocaleOption?> _selectPreferredLocale() async {
     final systemLocale = await _speechToText.systemLocale();

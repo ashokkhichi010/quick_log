@@ -2,11 +2,12 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
-import 'package:quick_log/src/core/storage/hive_adapters.dart';
-import 'package:quick_log/src/features/logs/data/hive_entries_repository.dart';
-import 'package:quick_log/src/features/logs/domain/entry_result.dart';
-import 'package:quick_log/src/features/logs/domain/log_entry.dart';
-import 'package:quick_log/src/features/logs/domain/log_entry_type.dart';
+import 'package:quick_log/core/storage/hive_adapters.dart';
+import 'package:quick_log/features/logs/data/hive_entries_repository.dart';
+import 'package:quick_log/features/logs/domain/entry_result.dart';
+import 'package:quick_log/features/logs/domain/log_entry.dart';
+import 'package:quick_log/features/logs/domain/log_entry_flavor.dart';
+import 'package:quick_log/features/logs/domain/log_entry_type.dart';
 
 void main() {
   late Directory tempDirectory;
@@ -36,11 +37,15 @@ void main() {
       task: 'Debugged sensor issues',
       categoryId: 'iot',
       entryType: LogEntryType.manual,
+      flavor: LogEntryFlavor.legacyStructured,
+      transcript: null,
       problem: null,
       solutionTried: null,
       result: EntryResult.partial,
       notes: null,
       isImportant: false,
+      archivedAt: null,
+      deletedAt: null,
       createdAt: DateTime(2026, 4, 8, 9),
       updatedAt: DateTime(2026, 4, 8, 9),
     );
@@ -50,11 +55,15 @@ void main() {
       task: 'Shipped quick-add UI',
       categoryId: 'flutter',
       entryType: LogEntryType.manual,
+      flavor: LogEntryFlavor.voice,
+      transcript: 'Shipped quick-add UI',
       problem: null,
       solutionTried: null,
       result: EntryResult.worked,
       notes: null,
       isImportant: true,
+      archivedAt: null,
+      deletedAt: null,
       createdAt: DateTime(2026, 4, 8, 11),
       updatedAt: DateTime(2026, 4, 8, 11),
     );

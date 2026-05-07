@@ -1,14 +1,15 @@
 import 'dart:async';
 
-import 'package:quick_log/src/core/models/export_format.dart';
-import 'package:quick_log/src/core/services/export_service.dart';
-import 'package:quick_log/src/core/services/notifications_service.dart';
-import 'package:quick_log/src/features/logs/domain/category.dart';
-import 'package:quick_log/src/features/logs/domain/log_entry.dart';
-import 'package:quick_log/src/features/logs/domain/repositories/categories_repository.dart';
-import 'package:quick_log/src/features/logs/domain/repositories/entries_repository.dart';
-import 'package:quick_log/src/features/settings/domain/app_settings.dart';
-import 'package:quick_log/src/features/settings/domain/repositories/settings_repository.dart';
+import 'package:quick_log/core/models/export_format.dart';
+import 'package:quick_log/core/services/export_service.dart';
+import 'package:quick_log/core/services/notifications_service.dart';
+import 'package:quick_log/features/logs/domain/category.dart';
+import 'package:quick_log/features/logs/domain/log_entry.dart';
+import 'package:quick_log/features/logs/domain/repositories/categories_repository.dart';
+import 'package:quick_log/features/logs/domain/repositories/entries_repository.dart';
+import 'package:quick_log/features/speech/services/speech_service.dart';
+import 'package:quick_log/features/settings/domain/app_settings.dart';
+import 'package:quick_log/features/settings/domain/repositories/settings_repository.dart';
 
 class FakeEntriesRepository implements EntriesRepository {
   FakeEntriesRepository([List<LogEntry>? seedEntries])
@@ -20,6 +21,11 @@ class FakeEntriesRepository implements EntriesRepository {
 
   @override
   Future<void> deleteEntry(String entryId) async {
+    _entries.removeWhere((item) => item.id == entryId);
+  }
+
+  @override
+  Future<void> permanentlyDeleteEntry(String entryId) async {
     _entries.removeWhere((item) => item.id == entryId);
   }
 
@@ -145,6 +151,82 @@ class FakeNotificationsService implements NotificationsService {
 
   void emitReminderAlert(ReminderAlertEvent event) {
     _reminderAlertsController.add(event);
+  }
+}
+
+class FakeSpeechService implements SpeechService {
+  FakeSpeechService({
+    this.permissionState = SpeechPermissionState.granted,
+    this.available = true,
+    this.locale = const SpeechLocaleOption(
+      localeId: 'en-IN',
+      name: 'English (India)',
+    ),
+  });
+
+  SpeechPermissionState permissionState;
+  bool available;
+  SpeechLocaleOption? locale;
+  bool _isListening = false;
+  void Function(String words, bool isFinal)? _resultCallback;
+  void Function(String status)? _statusCallback;
+  void Function(String errorMessage, bool permanent)? _errorCallback;
+
+  @override
+  SpeechLocaleOption? get activeLocale => locale;
+
+  @override
+  bool get isListening => _isListening;
+
+  @override
+  Future<void> cancelListening() async {
+    _isListening = false;
+    _statusCallback?.call('notListening');
+  }
+
+  @override
+  Future<bool> checkAvailability() async => available;
+
+  @override
+  Future<SpeechPermissionState> ensureMicrophonePermission() async {
+    return permissionState;
+  }
+
+  @override
+  Future<SpeechAvailability> initialize() async {
+    return SpeechAvailability(
+      isAvailable: available,
+      activeLocale: locale,
+      locales: locale == null ? const [] : [locale!],
+    );
+  }
+
+  @override
+  Future<void> startListening({
+    required void Function(String words, bool isFinal) onResult,
+    required void Function(String status) onStatus,
+    required void Function(String errorMessage, bool permanent) onError,
+  }) async {
+    _isListening = true;
+    _resultCallback = onResult;
+    _statusCallback = onStatus;
+    _errorCallback = onError;
+    _statusCallback?.call('listening');
+  }
+
+  @override
+  Future<void> stopListening() async {
+    _isListening = false;
+    _statusCallback?.call('done');
+  }
+
+  void emitResult(String words, {bool isFinal = false}) {
+    _resultCallback?.call(words, isFinal);
+  }
+
+  void emitError(String message, {bool permanent = true}) {
+    _isListening = false;
+    _errorCallback?.call(message, permanent);
   }
 }
 

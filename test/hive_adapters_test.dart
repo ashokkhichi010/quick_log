@@ -2,9 +2,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/src/binary/binary_reader_impl.dart';
 import 'package:hive/src/binary/binary_writer_impl.dart';
 import 'package:hive/src/registry/type_registry_impl.dart';
-import 'package:quick_log/src/core/storage/hive_adapters.dart';
-import 'package:quick_log/src/features/logs/domain/entry_result.dart';
-import 'package:quick_log/src/features/settings/domain/app_settings.dart';
+import 'package:quick_log/core/storage/hive_adapters.dart';
+import 'package:quick_log/features/logs/domain/entry_result.dart';
+import 'package:quick_log/features/settings/domain/app_settings.dart';
 
 void main() {
   test('AppSettingsAdapter reads legacy settings payloads safely', () {

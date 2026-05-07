@@ -1,45 +1,34 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:quick_log/src/core/models/export_format.dart';
-import 'package:quick_log/src/core/services/export_service.dart';
-import 'package:quick_log/src/features/logs/domain/category.dart';
-import 'package:quick_log/src/features/logs/domain/entry_result.dart';
-import 'package:quick_log/src/features/logs/domain/log_entry.dart';
-import 'package:quick_log/src/features/logs/domain/log_entry_type.dart';
+import 'package:quick_log/core/models/export_format.dart';
+import 'package:quick_log/core/services/export_service.dart';
+import 'package:quick_log/features/logs/domain/category.dart';
+import 'package:quick_log/features/logs/domain/log_entry.dart';
 
 void main() {
   final builder = const ExportContentBuilder();
   final category = Category(id: 'flutter', name: 'Flutter', isDefault: true);
-  final entry = LogEntry(
+  final entry = LogEntry.voice(
     id: 'entry-1',
-    timestamp: DateTime(2026, 4, 8, 10, 30),
-    task: 'Built the timeline screen',
-    categoryId: category.id,
-    entryType: LogEntryType.manual,
-    problem: 'List felt too dense',
-    solutionTried: 'Grouped logs by hour',
-    result: EntryResult.worked,
-    notes: 'Much easier to scan',
-    isImportant: true,
+    transcript: 'Built the voice capture flow and tested export.',
     createdAt: DateTime(2026, 4, 8, 10, 30),
-    updatedAt: DateTime(2026, 4, 8, 10, 35),
+    isImportant: true,
   );
 
-  test('builds CSV with headers and escaped values', () {
+  test('builds CSV with transcript-first headers', () {
     final csv = builder.build(
       format: ExportFormat.csv,
       entries: [entry],
       categories: [category],
     );
 
-    expect(csv, contains('id,timestamp,task,category'));
-    expect(csv, contains('"Built the timeline screen"'));
-    expect(csv, contains('"Flutter"'));
-    expect(csv, contains('"Worked"'));
+    expect(csv, contains('Date,Time,Transcript,Important,Type'));
+    expect(csv, contains('"Built the voice capture flow and tested export."'));
+    expect(csv, contains('"Voice"'));
   });
 
-  test('builds JSON with readable category names', () {
+  test('builds JSON with transcript and type', () {
     final jsonString = builder.build(
       format: ExportFormat.json,
       entries: [entry],
@@ -48,8 +37,8 @@ void main() {
 
     final decoded = jsonDecode(jsonString) as List<dynamic>;
     expect(decoded, hasLength(1));
-    expect(decoded.first['category'], 'Flutter');
+    expect(decoded.first['transcript'], contains('voice capture flow'));
     expect(decoded.first['important'], true);
-    expect(decoded.first['result'], 'worked');
+    expect(decoded.first['type'], 'voice');
   });
 }

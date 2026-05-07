@@ -26,7 +26,8 @@ class RecordingBottomSheet extends ConsumerStatefulWidget {
   const RecordingBottomSheet({super.key});
 
   @override
-  ConsumerState<RecordingBottomSheet> createState() => _RecordingBottomSheetState();
+  ConsumerState<RecordingBottomSheet> createState() =>
+      _RecordingBottomSheetState();
 }
 
 class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
@@ -70,7 +71,8 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
       previous,
       next,
     ) {
-      if (next.errorMessage != null && next.errorMessage != previous?.errorMessage) {
+      if (next.errorMessage != null &&
+          next.errorMessage != previous?.errorMessage) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
@@ -157,6 +159,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
                 controller: _transcriptController,
                 onChanged: _voiceCaptureController.updateEditableTranscript,
                 onCancel: () => _cancelAndClose(context),
+                onContinueRecording: _voiceCaptureController.continueFromReview,
                 onSave: () => _saveAndClose(context),
               )
             else ...[
@@ -166,6 +169,7 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
                 paused: isPaused,
                 onMicPressed: _voiceCaptureController.toggleRecording,
                 onContinuePressed: _voiceCaptureController.continueRecording,
+                onCompletePressed: _voiceCaptureController.stopRecording,
                 onStopPressed: _voiceCaptureController.stopRecording,
                 pulse: _pulseController,
                 statusLabel: _statusLabel(voiceState),
@@ -187,6 +191,35 @@ class _RecordingBottomSheetState extends ConsumerState<RecordingBottomSheet>
 
   Future<void> _cancelAndClose(BuildContext context) async {
     final navigator = Navigator.of(context);
+    final voiceState = ref.read(voiceCaptureControllerProvider);
+    final hasTranscript = voiceState.editableTranscript.trim().isNotEmpty;
+    if (hasTranscript) {
+      final shouldDiscard = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Discard recording?'),
+            content: const Text(
+              'You have an unsaved transcript. Closing now will discard it.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Keep editing'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Discard'),
+              ),
+            ],
+          );
+        },
+      );
+      if (shouldDiscard != true) {
+        return;
+      }
+    }
+
     await _voiceCaptureController.cancelRecording();
     if (!mounted) {
       return;
@@ -234,12 +267,14 @@ class _ResultState extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     required this.onCancel,
+    required this.onContinueRecording,
     required this.onSave,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onCancel;
+  final VoidCallback onContinueRecording;
   final VoidCallback onSave;
 
   @override
@@ -248,24 +283,25 @@ class _ResultState extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text('Review transcript', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Review transcript',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 12),
         TranscriptEditor(controller: controller, onChanged: onChanged),
         const SizedBox(height: 14),
         Row(
           children: [
             Expanded(
-              child: OutlinedButton(
-                onPressed: onCancel,
-                child: const Text('Cancel'),
+              child: OutlinedButton.icon(
+                onPressed: onContinueRecording,
+                icon: const Icon(Icons.mic_rounded),
+                label: const Text('Continue'),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: FilledButton(
-                onPressed: onSave,
-                child: const Text('Save'),
-              ),
+              child: FilledButton(onPressed: onSave, child: const Text('Save')),
             ),
           ],
         ),
